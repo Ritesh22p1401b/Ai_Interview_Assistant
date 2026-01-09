@@ -4,28 +4,14 @@ import {
   getTopper,
   getLeaderboard
 } from "../controllers/admin.controller.js";
+import { protect, adminOnly } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-/**
- * @route   GET /api/admin/candidates
- * @desc    Get all candidates with scores
- * @access  Admin
- */
+router.use(protect, adminOnly);
+
 router.get("/candidates", getAllCandidates);
-
-/**
- * @route   GET /api/admin/topper
- * @desc    Get top scoring candidate
- * @access  Admin
- */
 router.get("/topper", getTopper);
-
-/**
- * @route   GET /api/admin/leaderboard
- * @desc    Get leaderboard (sorted)
- * @access  Admin
- */
 router.get("/leaderboard", getLeaderboard);
 
 export default router;

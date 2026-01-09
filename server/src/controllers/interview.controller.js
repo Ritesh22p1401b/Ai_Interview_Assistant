@@ -1,43 +1,18 @@
-import Interview from "../models/Interview.model.js";
-import Score from "../models/Score.model.js";
+import Resume from "../models/Resume.model.js";
+import { aiQueue } from "../queues/ai.queue.js";
 
-export const startInterview = async (req, res) => {
-  const questions = [
-    "Explain your last project",
-    "What is REST API?",
-    "Explain MongoDB indexing"
-  ];
-
-  const interview = await Interview.create({
-    userId: req.body.userId,
-    questions
+export const uploadResume = async (req, res) => {
+  const resume = await Resume.create({
+    userId: req.user._id,
+    filePath: req.file.path
   });
 
-  res.json(interview);
-};
-
-export const submitInterview = async (req, res) => {
-  const { interviewId, answers } = req.body;
-
-  const interview = await Interview.findByIdAndUpdate(
-    interviewId,
-    { answers, completed: true },
-    { new: true }
-  );
-
-  const scoreValue = Math.floor(Math.random() * 40) + 60;
-
-  const score = await Score.create({
-    userId: interview.userId,
-    interviewId,
-    score: scoreValue,
-    breakdown: {
-      technical: 80,
-      communication: 75,
-      confidence: 70,
-      relevance: 85
-    }
+  await aiQueue.add("process-resume", {
+    filePath: req.file.path
   });
 
-  res.json({ interview, score });
+  res.status(202).json({
+    message: "Resume uploaded. AI processing started.",
+    resumeId: resume._id
+  });
 };
