@@ -1,9 +1,15 @@
-import Redis from "redis";
 import IORedis from "ioredis";
 
-export const connection = new IORedis(process.env.REDIS_URL);
-export const redisClient = Redis.createClient({
-  url: process.env.REDIS_URL
+export const connection = new IORedis(process.env.REDIS_URL, {
+  maxRetriesPerRequest: null
 });
 
-redisClient.connect();
+connection.on("connect", () => {
+  console.log("✅ Redis connected");
+});
+
+connection.on("error", (err) => {
+  console.error("❌ Redis error:", err.message);
+});
+
+
