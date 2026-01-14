@@ -24,12 +24,12 @@ app.use(
 app.use(
   session({
     name: "ai-resume.sid",
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || "dev-fallback-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // true only in HTTPS
+      secure: false,
     },
   })
 );
