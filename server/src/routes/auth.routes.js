@@ -3,16 +3,24 @@ import passport from "passport";
 
 const router = express.Router();
 
+// Start Google OAuth
 router.get(
   "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
+  passport.authenticate("google", {
+    scope: ["profile", "email"]
+  })
 );
 
+// Google OAuth callback
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false }),
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    session: true
+  }),
   (req, res) => {
-    res.redirect("http://localhost:5173"); // frontend later
+    // Temporary success response
+    res.send("Google OAuth success");
   }
 );
 

@@ -1,26 +1,32 @@
 import express from "express";
+import session from "express-session";
+import passport from "passport";
 import cors from "cors";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import resumeRoutes from "./routes/resume.routes.js";
-import interviewRoutes from "./routes/interview.routes.js";
-import adminRoutes from "./routes/admin.routes.js";
+
+// 🔥 passport config imported AFTER dotenv ran in server.js
+import "./config/passport.js";
+import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(helmet());
-
 app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true
   })
 );
 
-app.use("/api/resume", resumeRoutes);
-app.use("/api/interview", interviewRoutes);
-app.use("/api/admin", adminRoutes);
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use("/api/auth", authRoutes);
 
 export default app;
