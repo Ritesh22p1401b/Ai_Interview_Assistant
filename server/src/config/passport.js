@@ -5,7 +5,7 @@ import User from "../models/User.model.js";
 // 🔥 FAIL FAST (THIS WILL SAVE HOURS)
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error(
-    "❌ GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Check .env loading order."
+    "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Check .env loading order."
   );
 }
 
