@@ -9,7 +9,7 @@ export const configurePassport = () => {
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     throw new Error(
-      "❌ GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing AFTER dotenv load"
+      "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET missing AFTER dotenv load"
     );
   }
 
