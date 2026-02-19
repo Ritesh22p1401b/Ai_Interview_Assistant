@@ -4,7 +4,7 @@ import session from "express-session";
 import passport from "passport";
 import cors from "cors";
 import helmet from "helmet";
-import RedisStore from "connect-redis";
+import { RedisStore } from "connect-redis";
 
 import { redisClient } from "./config/redis.js"; // ✅ IMPORT REDIS
 import { connectDB } from "./config/db.js";
