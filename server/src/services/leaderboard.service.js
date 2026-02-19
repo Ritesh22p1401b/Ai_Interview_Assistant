@@ -1,12 +1,14 @@
-import { redisClient } from "../config/redis.js";
+import IORedis from "ioredis";
+
+const redis = new IORedis(process.env.REDIS_URL);
 
 export const updateLeaderboard = async (userId, score) => {
-  await redisClient.zAdd("leaderboard", {
+  await redis.zAdd("leaderboard", {
     score,
     value: userId.toString()
   });
 };
 
-export const getTopper = async () => {
-  return redisClient.zRange("leaderboard", 0, 0, { REV: true });
+export const getLeaderboard = async () => {
+  return redis.zRange("leaderboard", 0, 9, { REV: true });
 };

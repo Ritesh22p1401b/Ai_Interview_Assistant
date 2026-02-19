@@ -1,88 +1,31 @@
 import express from "express";
 import passport from "passport";
+import { register, login } from "../controllers/auth.controller.js";
+import { generateToken } from "../utils/jwt.js";
 
 const router = express.Router();
 
-/**
- * ================================
- *  START GOOGLE OAUTH
- *  GET /api/auth/google
- * ================================
- */
+// EMAIL AUTH
+router.post("/register", register);
+router.post("/login", login);
+
+// GOOGLE AUTH
 router.get(
   "/google",
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-  })
+  passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
-/**
- * ================================
- *  GOOGLE OAUTH CALLBACK
- *  GET /api/auth/google/callback
- * ================================
- */
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "/api/auth/failure",
-    session: true,
-  }),
+  passport.authenticate("google", { session: false }),
   (req, res) => {
-    // ✅ Successful authentication
-    // User is now available as req.user
-    res.redirect("http://localhost:5173/dashboard");
+    const token = generateToken(req.user._id);
+
+    // Redirect to frontend with JWT
+    res.redirect(
+      `http://localhost:5173/oauth-success?token=${token}`
+    );
   }
 );
-
-/**
- * ================================
- *  AUTH FAILURE
- *  GET /api/auth/failure
- * ================================
- */
-router.get("/failure", (req, res) => {
-  res.status(401).json({
-    success: false,
-    message: "Google authentication failed",
-  });
-});
-
-/**
- * ================================
- *  GET CURRENT LOGGED-IN USER
- *  GET /api/auth/me
- * ================================
- */
-router.get("/me", (req, res) => {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
-    return res.status(401).json({
-      authenticated: false,
-      user: null,
-    });
-  }
-
-  res.json({
-    authenticated: true,
-    user: req.user,
-  });
-});
-
-/**
- * ================================
- *  LOGOUT
- *  GET /api/auth/logout
- * ================================
- */
-router.get("/logout", (req, res, next) => {
-  req.logout(err => {
-    if (err) return next(err);
-
-    req.session.destroy(() => {
-      res.clearCookie("ai-resume.sid");
-      res.json({ success: true, message: "Logged out successfully" });
-    });
-  });
-});
 
 export default router;
