@@ -6,10 +6,13 @@ import cors from "cors";
 import helmet from "helmet";
 import { RedisStore } from "connect-redis";
 
-import { redisClient } from "./config/redis.js"; // ✅ IMPORT REDIS
+import { redisClient } from "./config/redis.js";
 import { connectDB } from "./config/db.js";
 import { configurePassport } from "./config/passport.js";
+
 import authRoutes from "./routes/auth.routes.js";
+import resumeRoutes from "./routes/resume.routes.js";
+import interviewRoutes from "./routes/interview.routes.js";
 
 const app = express();
 
@@ -32,27 +35,39 @@ const redisStore = new RedisStore({
 
 app.use(
   session({
-    store: redisStore, // ✅ Redis-backed sessions
+    store: redisStore,
     name: "ai-resume.sid",
     secret: process.env.SESSION_SECRET || "dev-fallback-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // set true in production with HTTPS
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      secure: false,
+      maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
 
 /* ------------------ PASSPORT ------------------ */
 configurePassport();
-
 app.use(passport.initialize());
 app.use(passport.session());
 
 /* ------------------ ROUTES ------------------ */
+
+// Auth
 app.use("/api/auth", authRoutes);
+
+// Resume upload + Gemini question generation
+app.use("/api/resume", resumeRoutes);
+
+// Interview related routes
+app.use("/api/interview", interviewRoutes);
+
+/* ------------------ HEALTH CHECK ------------------ */
+app.get("/api/health", (req, res) => {
+  res.json({ status: "Server working 🚀" });
+});
 
 /* ------------------ START SERVER ------------------ */
 const PORT = process.env.PORT || 5000;
