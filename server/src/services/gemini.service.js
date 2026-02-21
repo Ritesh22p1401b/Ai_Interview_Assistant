@@ -1,16 +1,25 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 🔐 Validate API key
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY missing in .env file");
+}
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
+// New SDK client
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 export const generateInterviewQuestions = async (resumeText) => {
-  const prompt = `
+  try {
+    if (!resumeText || resumeText.length < 50) {
+      throw new Error("Resume text too short");
+    }
+
+    const prompt = `
 You are a senior technical interviewer.
 
 Based strictly on this resume content, generate:
@@ -18,7 +27,7 @@ Based strictly on this resume content, generate:
 - 3 project deep dive questions
 - 2 behavioral questions
 
-Return ONLY valid JSON.
+Return ONLY valid JSON in this format:
 
 {
   "technical": [],
@@ -30,17 +39,31 @@ Resume:
 ${resumeText}
 `;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
 
-    // 🔥 Clean markdown if Gemini wraps it
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    let text = response.text;
 
-    return JSON.parse(text);
+    console.log("Gemini Raw Output:\n", text);
+
+    // Remove markdown if present
+    text = text
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const parsed = JSON.parse(text);
+
+    if (!parsed.technical || !parsed.project || !parsed.behavioral) {
+      throw new Error("Invalid JSON structure from Gemini");
+    }
+
+    return parsed;
+
   } catch (error) {
-    console.error("Gemini Error:", error.message);
+    console.error("Gemini Service Error:", error.message);
     throw new Error("Gemini AI failed");
   }
 };
