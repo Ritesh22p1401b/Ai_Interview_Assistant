@@ -1,14 +1,13 @@
-import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 const Home = () => {
-  const { user } = useContext(AuthContext);
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handlePrimaryClick = () => {
-    if (user) {
-      navigate("/upload-resume");
+    if (isAuthenticated) {
+      navigate("/upload");
     } else {
       navigate("/login");
     }
@@ -41,10 +40,10 @@ const Home = () => {
           onClick={handlePrimaryClick}
           className="px-8 py-4 bg-green-400 text-black text-lg font-semibold rounded-xl shadow-lg hover:scale-105 transition duration-300"
         >
-          {user ? "Start Interview" : "Login to Start"}
+          {isAuthenticated ? "Start Interview" : "Login to Start"}
         </button>
 
-        {!user && (
+        {!isAuthenticated && (
           <button
             onClick={() => navigate("/signup")}
             className="px-8 py-4 border border-gray-700 text-white rounded-xl hover:bg-gray-800 transition"
@@ -56,7 +55,7 @@ const Home = () => {
 
       {/* Feature Cards */}
       <div className="mt-24 grid md:grid-cols-3 gap-8 max-w-6xl w-full z-10">
-        
+
         <div className="bg-black/40 backdrop-blur-md p-6 rounded-xl border border-gray-800 hover:border-green-400 transition">
           <h3 className="text-xl font-semibold mb-3 text-green-400">
             Resume-Based Questions

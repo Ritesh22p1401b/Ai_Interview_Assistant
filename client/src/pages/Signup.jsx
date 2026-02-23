@@ -1,9 +1,10 @@
-import { useState, useContext } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
+import axios from "../services/axios";
 
 export default function Signup() {
-  const { signup } = useContext(AuthContext);
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -12,17 +13,31 @@ export default function Signup() {
     password: "",
   });
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      await signup(form);
+      const response = await axios.post("/auth/signup", form);
+
+      // 🔥 Important: expects { token, user } from backend
+      await signup(response.data);
+
       navigate("/dashboard");
-    } catch (error) {
-      alert("Signup failed");
+    } catch (err) {
+      setError(
+        err.response?.data?.message || "Signup failed. Try again."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,6 +48,12 @@ export default function Signup() {
         <h2 className="text-3xl font-bold text-center mb-6">
           Create Account
         </h2>
+
+        {error && (
+          <div className="bg-red-500/20 text-red-400 p-3 rounded mb-4 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -68,9 +89,10 @@ export default function Signup() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition"
+            disabled={loading}
+            className="w-full py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-60"
           >
-            Sign Up
+            {loading ? "Creating Account..." : "Sign Up"}
           </button>
 
         </form>
