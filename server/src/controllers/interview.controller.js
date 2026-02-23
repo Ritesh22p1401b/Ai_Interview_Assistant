@@ -1,18 +1,31 @@
 import Resume from "../models/Resume.model.js";
-import { aiQueue } from "../queues/ai.queue.js";
 
-export const uploadResume = async (req, res) => {
-  const resume = await Resume.create({
-    userId: req.user._id,
-    filePath: req.file.path
-  });
+export const getInterviewById = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-  await aiQueue.add("process-resume", {
-    filePath: req.file.path
-  });
+    const interview = await Resume.findById(id);
 
-  res.status(202).json({
-    message: "Resume uploaded. AI processing started.",
-    resumeId: resume._id
-  });
+    if (!interview) {
+      return res.status(404).json({
+        message: "Interview not found",
+      });
+    }
+
+    // Return mock questions for now (replace with AI result later)
+    res.status(200).json({
+      interviewId: interview._id,
+      questions: [
+        "Explain your last project in detail.",
+        "What is REST API and how does it work?",
+        "Explain MongoDB indexing.",
+      ],
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
 };

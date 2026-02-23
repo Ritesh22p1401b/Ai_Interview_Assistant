@@ -1,15 +1,9 @@
 import express from "express";
+import { getInterviewById } from "../controllers/interview.controller.js";
 
 const router = express.Router();
 
-router.get("/start", (req, res) => {
-  res.json({
-    questions: [
-      "Explain your last project",
-      "What is REST API?",
-      "Explain MongoDB indexing",
-    ],
-  });
-});
+// GET interview by ID
+router.get("/:id", getInterviewById);
 
 export default router;

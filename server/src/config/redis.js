@@ -1,14 +1,16 @@
-// config/redis.js
 import IORedis from "ioredis";
 
-export const redisClient = new IORedis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
-});
+export const connection = new IORedis(
+  process.env.REDIS_URL || "redis://127.0.0.1:6379",
+  {
+    maxRetriesPerRequest: null,
+  }
+);
 
-redisClient.on("connect", () => {
+connection.on("connect", () => {
   console.log("✅ Redis connected");
 });
 
-redisClient.on("error", (err) => {
+connection.on("error", (err) => {
   console.error("❌ Redis error:", err.message);
 });
