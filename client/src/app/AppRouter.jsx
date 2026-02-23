@@ -1,3 +1,5 @@
+// src/app/AppRouter.jsx
+
 import { Routes, Route } from "react-router-dom";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
@@ -8,7 +10,7 @@ import Result from "../pages/Result";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
 
-export default function Router() {
+export default function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
