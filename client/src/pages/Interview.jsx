@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import API from "../app/axios";
+import API from "../services/axios";
 
 export default function Interview() {
   const { id } = useParams();
