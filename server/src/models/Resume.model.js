@@ -4,7 +4,9 @@ const resumeSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     fileName: String,
-    filePath: String
+    filePath: String,
+
+    extractedText: String, // 🔥 Needed for AI generation
   },
   { timestamps: true }
 );

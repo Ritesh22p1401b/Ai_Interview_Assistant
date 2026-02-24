@@ -9,23 +9,32 @@ export default function Interview() {
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
   const [timer, setTimer] = useState(60);
-
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioBlob, setAudioBlob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState(null);
   const [feedback, setFeedback] = useState("");
 
-  const chunksRef = useRef([]);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [recordingStart, setRecordingStart] = useState(null);
 
-  // Fetch questions
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+
+  /* ---------------- FETCH INTERVIEW ---------------- */
   useEffect(() => {
-    API.get(`/interview/${id}`).then(res => {
-      setQuestions(res.data.questions);
-    });
+    const fetchInterview = async () => {
+      try {
+        const res = await API.get(`/interview/${id}`);
+        setQuestions(res.data.questions || []);
+      } catch (error) {
+        console.error("Fetch interview error:", error);
+      }
+    };
+
+    fetchInterview();
   }, [id]);
 
-  // Speak question when it changes
+  /* ---------------- SPEECH ---------------- */
   useEffect(() => {
     if (questions.length && questions[current]) {
       const speech = new SpeechSynthesisUtterance(questions[current]);
@@ -35,24 +44,27 @@ export default function Interview() {
     }
   }, [questions, current]);
 
-  // Timer logic
+  /* ---------------- TIMER ---------------- */
   useEffect(() => {
     if (!questions.length) return;
 
-    if (timer === 0) {
-      stopRecording();
-      submitAnswer();
-      return;
-    }
+    clearInterval(timerRef.current);
 
-    const interval = setInterval(() => {
-      setTimer(prev => prev - 1);
+    timerRef.current = setInterval(() => {
+      setTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [timer]);
+    return () => clearInterval(timerRef.current);
+  }, [current, questions]);
 
-  // 🎤 Start Recording
+  /* ---------------- RECORDING ---------------- */
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
@@ -68,48 +80,65 @@ export default function Interview() {
     };
 
     recorder.start();
+    setRecordingStart(Date.now());
     setMediaRecorder(recorder);
   };
 
-  // Stop Recording
   const stopRecording = () => {
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
     }
   };
 
-  // Submit audio to backend
+  /* ---------------- SUBMIT ---------------- */
   const submitAnswer = async () => {
-    if (!audioBlob) return;
+    if (!audioBlob || loading) return;
 
     setLoading(true);
+
+    const duration =
+      recordingStart ? Math.floor((Date.now() - recordingStart) / 1000) : 0;
 
     const formData = new FormData();
     formData.append("audio", audioBlob);
     formData.append("interviewId", id);
     formData.append("questionIndex", current);
+    formData.append("audioDuration", duration);
 
-    const res = await API.post("/interview/submit-audio", formData);
+    try {
+      const res = await API.post("/interview/submit-audio", formData);
 
-    setScore(res.data.score);
-    setFeedback(res.data.feedback);
-    setLoading(false);
+      setScore(res.data.score);
+      setFeedback(res.data.feedback);
+    } catch (err) {
+      console.error("Submit error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAutoSubmit = () => {
+    stopRecording();
+    setTimeout(submitAnswer, 800);
   };
 
   const handleNext = () => {
+    clearInterval(timerRef.current);
+
     setTimer(60);
     setScore(null);
     setFeedback("");
     setAudioBlob(null);
+    setRecordingStart(null);
 
     if (current + 1 < questions.length) {
-      setCurrent(current + 1);
+      setCurrent(prev => prev + 1);
     } else {
       navigate(`/result/${id}`);
     }
   };
 
-  if (!questions.length) return <p>Loading...</p>;
+  if (!questions.length) return <p>Loading interview...</p>;
 
   return (
     <div style={{ padding: 40 }}>
@@ -119,9 +148,15 @@ export default function Interview() {
       <p>{questions[current]}</p>
 
       <div style={{ marginTop: 20 }}>
-        <button onClick={startRecording}>Start Recording</button>
-        <button onClick={stopRecording}>Stop</button>
-        <button onClick={submitAnswer}>Submit</button>
+        <button onClick={startRecording} disabled={loading}>
+          Start Recording
+        </button>
+        <button onClick={stopRecording} disabled={loading}>
+          Stop
+        </button>
+        <button onClick={submitAnswer} disabled={loading}>
+          Submit
+        </button>
       </div>
 
       {loading && <p>Evaluating your answer...</p>}
@@ -130,7 +165,11 @@ export default function Interview() {
         <div style={{ marginTop: 20 }}>
           <h4>Score: {score}/10</h4>
           <p>{feedback}</p>
-          <button onClick={handleNext}>Next Question</button>
+          <button onClick={handleNext}>
+            {current + 1 < questions.length
+              ? "Next Question"
+              : "View Result"}
+          </button>
         </div>
       )}
     </div>

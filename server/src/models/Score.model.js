@@ -4,13 +4,22 @@ const scoreSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     interviewId: { type: mongoose.Schema.Types.ObjectId, ref: "Interview" },
-    score: Number,
+
+    totalScore: Number,
+
     breakdown: {
       technical: Number,
+      project: Number,
+      behavioral: Number,
       communication: Number,
       confidence: Number,
-      relevance: Number
-    }
+      relevance: Number,
+    },
+
+    recommendation: {
+      type: String,
+      enum: ["Strong Hire", "Hire", "Borderline", "Reject"],
+    },
   },
   { timestamps: true }
 );

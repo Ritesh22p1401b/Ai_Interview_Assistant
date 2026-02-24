@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import API from "../services/axios";
 
 const UploadResume = () => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
-
-  const token = localStorage.getItem("token");
 
   const validateFile = (selectedFile) => {
     const allowedTypes = [
@@ -18,12 +17,12 @@ const UploadResume = () => {
     ];
 
     if (!allowedTypes.includes(selectedFile.type)) {
-      alert("Only PDF, DOC, DOCX files are allowed.");
+      setMessage("Only PDF, DOC, DOCX files are allowed.");
       return false;
     }
 
     if (selectedFile.size > 5 * 1024 * 1024) {
-      alert("File size must be less than 5MB.");
+      setMessage("File size must be less than 5MB.");
       return false;
     }
 
@@ -34,41 +33,44 @@ const UploadResume = () => {
     if (!selectedFile) return;
     if (validateFile(selectedFile)) {
       setFile(selectedFile);
+      setMessage("");
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      alert("Please select a resume first.");
-      return;
-    }
-
-    if (!token) {
-      alert("User not authenticated.");
-      return;
-    }
+    if (!file || loading) return;
 
     try {
       setLoading(true);
-
+      setMessage("Uploading resume...");
+      
       const formData = new FormData();
       formData.append("resume", file);
 
-      const response = await axios.post(
-        "http://localhost:5000/api/resume/upload",
+      const response = await API.post(
+        "/resume/upload",
         formData,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         }
       );
 
-      navigate(`/interview/${response.data.interviewId}`);
+      setMessage("Analyzing resume & generating questions...");
+
+      // Small UX delay for smoother transition
+      setTimeout(() => {
+        navigate(`/interview/${response.data.interviewId}`);
+      }, 1200);
 
     } catch (error) {
       console.error(error);
-      alert(error?.response?.data?.message || "Upload failed");
+
+      if (error.response?.status === 401) {
+        setMessage("Session expired. Please login again.");
+      } else {
+        setMessage(error?.response?.data?.message || "Upload failed.");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -99,6 +101,7 @@ const UploadResume = () => {
           accept=".pdf,.doc,.docx"
           onChange={(e) => handleFileSelect(e.target.files[0])}
           className="mb-6"
+          disabled={loading}
         />
 
         <p className="text-sm text-gray-400 mb-4">
@@ -107,10 +110,10 @@ const UploadResume = () => {
 
         <button
           onClick={handleUpload}
-          disabled={loading}
+          disabled={loading || !file}
           className="px-6 py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-50"
         >
-          {loading ? "Uploading..." : "Upload & Start Interview"}
+          {loading ? "Processing..." : "Upload & Start Interview"}
         </button>
       </div>
 
@@ -119,6 +122,12 @@ const UploadResume = () => {
           <p className="font-semibold">Selected File:</p>
           <p>{file.name}</p>
         </div>
+      )}
+
+      {message && (
+        <p className="mt-6 text-yellow-400 text-center">
+          {message}
+        </p>
       )}
     </div>
   );

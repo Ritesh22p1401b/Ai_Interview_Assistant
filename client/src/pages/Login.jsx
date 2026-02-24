@@ -30,7 +30,7 @@ export default function Login() {
       // 🔥 IMPORTANT LINE
       await login(response.data);
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError(
         err.response?.data?.message || "Invalid email or password"
