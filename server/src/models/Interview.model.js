@@ -1,13 +1,26 @@
 import mongoose from "mongoose";
 
-const interviewSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    questions: [String],
-    answers: [String],
-    completed: { type: Boolean, default: false }
-  },
-  { timestamps: true }
-);
+const answerSchema = new mongoose.Schema({
+  question: String,
+  audioUrl: String,
+  transcript: String,
+  score: Number,
+  feedback: String,
+});
 
-export default mongoose.model("Interview", interviewSchema);
+const interviewSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  resumeText: String,
+  questions: [String],
+  answers: [answerSchema],
+  totalScore: Number,
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+export const Interview = mongoose.model("Interview", interviewSchema);

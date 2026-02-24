@@ -1,9 +1,13 @@
 import express from "express";
-import { getInterviewById } from "../controllers/interview.controller.js";
+import { submitAnswerAudio } from "../controllers/interview.controller.js";
+import { uploadAudio } from "../middleware/audioUpload.js";
 
 const router = express.Router();
 
-// GET interview by ID
-router.get("/:id", getInterviewById);
+router.post(
+  "/submit-audio",
+  uploadAudio.single("audio"),
+  submitAnswerAudio
+);
 
 export default router;

@@ -1,31 +1,42 @@
-import Resume from "../models/Resume.model.js";
+import { transcribeAudio } from "../services/whisper.service.js";
+import { evaluateAnswer } from "../services/geminiEvaluation.service.js";
+import { Interview } from "../models/Interview.model.js";
+import fs from "fs";
 
-export const getInterviewById = async (req, res) => {
+export const submitAnswerAudio = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { interviewId, questionIndex } = req.body;
+    const filePath = req.file.path;
 
-    const interview = await Resume.findById(id);
+    const transcript = await transcribeAudio(filePath);
 
-    if (!interview) {
-      return res.status(404).json({
-        message: "Interview not found",
-      });
-    }
+    const interview = await Interview.findById(interviewId);
 
-    // Return mock questions for now (replace with AI result later)
-    res.status(200).json({
-      interviewId: interview._id,
-      questions: [
-        "Explain your last project in detail.",
-        "What is REST API and how does it work?",
-        "Explain MongoDB indexing.",
-      ],
+    const question = interview.questions[questionIndex];
+
+    const evaluation = await evaluateAnswer(question, transcript);
+
+    interview.answers.push({
+      question,
+      audioUrl: filePath,
+      transcript,
+      score: evaluation.score,
+      feedback: evaluation.feedback,
     });
 
+    interview.totalScore =
+      (interview.totalScore || 0) + evaluation.score;
+
+    await interview.save();
+
+    fs.unlinkSync(filePath);
+
+    res.json({
+      transcript,
+      score: evaluation.score,
+      feedback: evaluation.feedback,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Server error",
-    });
+    res.status(500).json({ message: error.message });
   }
 };
