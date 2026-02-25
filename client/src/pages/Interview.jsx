@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../services/axios";
+import AISphere from "../components/AISphere";
+
 
 export default function Interview() {
   const { id } = useParams();
@@ -193,81 +195,95 @@ export default function Interview() {
     return <p className="text-center mt-20">Loading Interview...</p>;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black to-gray-900 text-white p-8">
-      <div className="w-full max-w-3xl bg-gray-800 p-10 rounded-2xl shadow-2xl">
+    <div className="min-h-screen bg-gradient-to-b from-[#050b18] via-black to-[#020611] text-white flex flex-col">
 
-        {/* PROGRESS */}
-        <div className="flex justify-between mb-6 text-sm text-gray-400">
+      {/* ================= TOP QUESTION ================= */}
+      <div className="pt-10 px-8 text-center">
+        <div className="flex justify-between text-sm text-blue-300 mb-4 opacity-70">
           <span>
             Question {current + 1} / {questions.length}
           </span>
-          {isRecording && <span className="text-green-400">Time: {timer}s</span>}
+
+          {isRecording && (
+            <span className="text-cyan-400 font-medium tracking-wider">
+              {timer}s
+            </span>
+          )}
         </div>
 
-        {/* QUESTION */}
-        <h3 className="text-2xl font-bold mb-4">
+        <h2 className="text-2xl md:text-3xl font-light leading-relaxed max-w-4xl mx-auto tracking-wide">
           {questions[current]}
-        </h3>
+        </h2>
+      </div>
 
-        {/* AI SPEAKING */}
+      {/* ================= AI SPHERE ================= */}
+      <div className="flex-1 flex items-center justify-center relative">
+
+        {/* Glow Aura Behind Sphere */}
+        <div className="absolute w-[500px] h-[500px] bg-cyan-500/10 blur-3xl rounded-full" />
+
+        <AISphere isSpeaking={isAISpeaking} />
+      </div>
+
+      {/* ================= STATUS TEXT ================= */}
+      <div className="text-center mb-6">
         {isAISpeaking && (
-          <div className="flex justify-center gap-2 mb-8">
-            {[...Array(6)].map((_, i) => (
-              <span
-                key={i}
-                className="w-2 h-10 bg-green-400 rounded animate-pulse"
-              />
-            ))}
-          </div>
-        )}
-
-        {/* RECORDING INDICATOR */}
-        {isRecording && (
-          <div className="text-center text-red-500 font-semibold mb-6 animate-pulse">
-            ● Recording...
-          </div>
-        )}
-
-        {/* BUTTONS */}
-        <div className="flex justify-center gap-6 mt-6">
-          <button
-            onClick={startRecording}
-            disabled={isAISpeaking || isRecording || loading}
-            className="px-6 py-3 bg-green-500 rounded-lg font-semibold disabled:opacity-50"
-          >
-            Start
-          </button>
-
-          <button
-            onClick={stopRecording}
-            disabled={!isRecording}
-            className="px-6 py-3 bg-yellow-500 rounded-lg font-semibold disabled:opacity-50"
-          >
-            Stop
-          </button>
-
-          <button
-            onClick={submitAnswer}
-            disabled={loading}
-            className="px-6 py-3 bg-blue-600 rounded-lg font-semibold disabled:opacity-50"
-          >
-            Submit
-          </button>
-
-          <button
-            onClick={skipQuestion}
-            disabled={loading}
-            className="px-6 py-3 bg-red-600 rounded-lg font-semibold disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-
-        {loading && (
-          <p className="text-center mt-6 text-green-400">
-            Processing...
+          <p className="text-cyan-400 tracking-widest text-sm animate-pulse">
+            AI SPEAKING...
           </p>
         )}
+
+        {isRecording && (
+          <p className="text-red-400 tracking-widest text-sm animate-pulse">
+            ● RECORDING
+          </p>
+        )}
+
+        {loading && (
+          <p className="text-cyan-300 tracking-widest text-sm">
+            Processing Answer...
+          </p>
+        )}
+      </div>
+
+      {/* ================= CONTROLS ================= */}
+      <div className="pb-10 flex justify-center gap-6">
+
+        <button
+          onClick={startRecording}
+          disabled={isAISpeaking || isRecording || loading}
+          className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg font-medium tracking-wide 
+                    hover:scale-105 transition disabled:opacity-40"
+        >
+          Start
+        </button>
+
+        <button
+          onClick={stopRecording}
+          disabled={!isRecording}
+          className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-medium tracking-wide 
+                    hover:scale-105 transition disabled:opacity-40"
+        >
+          Stop
+        </button>
+
+        <button
+          onClick={submitAnswer}
+          disabled={loading}
+          className="px-6 py-3 bg-gradient-to-r from-blue-700 to-indigo-700 rounded-lg font-medium tracking-wide 
+                    hover:scale-105 transition disabled:opacity-40"
+        >
+          Submit
+        </button>
+
+        <button
+          onClick={skipQuestion}
+          disabled={loading}
+          className="px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 rounded-lg font-medium tracking-wide 
+                    hover:scale-105 transition disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
     </div>
   );
