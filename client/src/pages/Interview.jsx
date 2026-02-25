@@ -8,7 +8,7 @@ export default function Interview() {
 
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
-  const [timer, setTimer] = useState(60);
+  const [timer, setTimer] = useState(45);
   const [isRecording, setIsRecording] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,7 @@ export default function Interview() {
         const res = await API.get(`/interview/${id}`);
         setQuestions(res.data.allQuestions || []);
       } catch (error) {
-        console.error(error);
+        console.error("Fetch error:", error);
       }
     };
     fetchInterview();
@@ -35,21 +35,23 @@ export default function Interview() {
   useEffect(() => {
     if (!questions[current]) return;
 
+    setTimer(45);
     setIsAISpeaking(true);
-    setTimer(60); // reset timer but do not start
+    chunksRef.current = [];
+    setIsRecording(false);
+
+    window.speechSynthesis.cancel();
 
     const speech = new SpeechSynthesisUtterance(questions[current]);
     speech.lang = "en-US";
+    speech.rate = 1;
 
-    speech.onend = () => {
-      setIsAISpeaking(false);
-    };
+    speech.onend = () => setIsAISpeaking(false);
 
-    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(speech);
   }, [questions, current]);
 
-  /* ---------------- START TIMER ONLY WHEN RECORDING ---------------- */
+  /* ---------------- TIMER ---------------- */
   const startTimer = () => {
     clearInterval(timerRef.current);
 
@@ -67,51 +69,65 @@ export default function Interview() {
 
   /* ---------------- RECORDING ---------------- */
   const startRecording = async () => {
-    if (isAISpeaking) return;
+    if (isAISpeaking || isRecording) return;
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    streamRef.current = stream;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-    const recorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = recorder;
+      const options = { mimeType: "audio/webm;codecs=opus" };
+      const recorder = new MediaRecorder(stream, options);
 
-    recorder.ondataavailable = (e) => {
-      chunksRef.current.push(e.data);
-    };
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
 
-    recorder.start();
-    setIsRecording(true);
-    startTimer();
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.start(1000); // 1 sec chunks (smaller payload)
+      setIsRecording(true);
+      startTimer();
+
+    } catch (err) {
+      alert("Microphone permission denied.");
+      console.error(err);
+    }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current?.state !== "inactive") {
+    if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }
 
     streamRef.current?.getTracks().forEach((track) => track.stop());
-    setIsRecording(false);
     clearInterval(timerRef.current);
+    setIsRecording(false);
   };
 
-  /* ---------------- SUBMIT ANSWER ---------------- */
+  /* ---------------- SUBMIT ---------------- */
   const submitAnswer = async () => {
-    if (!chunksRef.current.length || loading) return;
+    if (!chunksRef.current.length || loading) {
+      alert("No recording detected.");
+      return;
+    }
 
+    stopRecording();
     setLoading(true);
 
     const blob = new Blob(chunksRef.current, { type: "audio/webm" });
     chunksRef.current = [];
 
     const formData = new FormData();
-    formData.append("audio", blob, "recording.webm");
+    formData.append("audio", blob, "answer.webm");
     formData.append("interviewId", id);
     formData.append("questionIndex", current);
 
     try {
-      await API.post("/interview/submit-audio", formData);
+      const res = await API.post("/interview/submit-audio", formData);
 
-      // Move to next question automatically
+      console.log("Gemini 2.5 Flash Response:", res.data);
+
       if (current + 1 < questions.length) {
         setCurrent((prev) => prev + 1);
       } else {
@@ -119,51 +135,54 @@ export default function Interview() {
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Submit error:", error);
+      alert("Submission failed.");
     } finally {
       setLoading(false);
-      setTimer(60);
-      setIsRecording(false);
     }
   };
 
   const handleAutoSubmit = () => {
-    stopRecording();
-    setTimeout(submitAnswer, 500);
+    if (!isRecording) return;
+    setTimeout(() => submitAnswer(), 300);
   };
 
-  if (!questions.length) return <p>Loading Interview...</p>;
+  if (!questions.length)
+    return <p className="text-center mt-20">Loading Interview...</p>;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black to-gray-900 text-white p-8">
+      <div className="w-full max-w-3xl bg-gray-800 p-10 rounded-2xl shadow-2xl">
 
-      <div className="w-full max-w-3xl bg-gray-900 p-8 rounded-xl shadow-lg">
-
-        {/* Timer */}
-        <div className="text-right text-green-400 font-semibold">
+        <div className="text-right mb-4 text-green-400 font-semibold">
           {isRecording && <p>Time Left: {timer}s</p>}
         </div>
 
-        {/* Question */}
-        <h3 className="text-2xl font-bold mb-6">
+        <h3 className="text-2xl font-bold mb-4">
           Question {current + 1}
         </h3>
 
-        <p className="text-lg mb-6">{questions[current]}</p>
+        <p className="text-lg mb-8 leading-relaxed">
+          {questions[current]}
+        </p>
 
-        {/* AI Speaking Wave Effect */}
-        <div className="flex justify-center items-center h-16 mb-8">
-          {isAISpeaking && (
-            <div className="flex gap-2">
-              <span className="w-2 h-8 bg-green-400 animate-bounce"></span>
-              <span className="w-2 h-10 bg-green-400 animate-bounce delay-100"></span>
-              <span className="w-2 h-6 bg-green-400 animate-bounce delay-200"></span>
-              <span className="w-2 h-9 bg-green-400 animate-bounce delay-300"></span>
-            </div>
-          )}
-        </div>
+        {isAISpeaking && (
+          <div className="flex justify-center gap-2 mb-8">
+            {[...Array(6)].map((_, i) => (
+              <span
+                key={i}
+                className="w-2 h-10 bg-green-400 rounded animate-pulse"
+              />
+            ))}
+          </div>
+        )}
 
-        {/* Controls */}
+        {isRecording && (
+          <div className="text-center text-red-500 font-semibold mb-6 animate-pulse">
+            ● Recording...
+          </div>
+        )}
+
         <div className="flex justify-center gap-6">
           <button
             onClick={startRecording}
@@ -183,7 +202,7 @@ export default function Interview() {
 
           <button
             onClick={submitAnswer}
-            disabled={isRecording || loading}
+            disabled={loading}
             className="px-6 py-3 bg-blue-600 rounded-lg font-semibold disabled:opacity-50"
           >
             Submit
@@ -192,7 +211,7 @@ export default function Interview() {
 
         {loading && (
           <p className="text-center mt-6 text-green-400">
-            Evaluating your answer...
+            Processing with Gemini 2.5 Flash...
           </p>
         )}
       </div>
