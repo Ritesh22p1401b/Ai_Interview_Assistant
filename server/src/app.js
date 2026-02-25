@@ -1,3 +1,5 @@
+// server/src/app.js
+
 import express from "express";
 import session from "express-session";
 import passport from "passport";
@@ -15,10 +17,14 @@ import interviewRoutes from "./routes/interview.routes.js";
 
 const app = express();
 
-/* ------------------ MIDDLEWARE ------------------ */
+/* ------------------ SECURITY ------------------ */
 app.use(helmet());
-app.use(express.json());
 
+/* ------------------ BODY PARSER ------------------ */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/* ------------------ CORS ------------------ */
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -53,7 +59,6 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 /* ------------------ ROUTES ------------------ */
-
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/interview", interviewRoutes);
@@ -61,6 +66,12 @@ app.use("/api/interview", interviewRoutes);
 /* ------------------ HEALTH CHECK ------------------ */
 app.get("/api/health", (req, res) => {
   res.json({ status: "Server working 🚀" });
+});
+
+/* ------------------ GLOBAL ERROR HANDLER ------------------ */
+app.use((err, req, res, next) => {
+  console.error("Unhandled Error:", err);
+  res.status(500).json({ message: "Internal Server Error" });
 });
 
 /* ------------------ START SERVER ------------------ */
@@ -74,6 +85,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
+
   } catch (error) {
     console.error("❌ Server failed to start:", error);
     process.exit(1);

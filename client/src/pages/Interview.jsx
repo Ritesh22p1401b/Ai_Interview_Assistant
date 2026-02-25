@@ -12,6 +12,7 @@ export default function Interview() {
   const [isRecording, setIsRecording] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("in-progress");
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -24,21 +25,26 @@ export default function Interview() {
       try {
         const res = await API.get(`/interview/${id}`);
         setQuestions(res.data.allQuestions || []);
+        setStatus(res.data.status || "in-progress");
+
+        if (res.data.status === "completed") {
+          navigate(`/result/${id}`);
+        }
       } catch (error) {
         console.error("Fetch error:", error);
       }
     };
     fetchInterview();
-  }, [id]);
+  }, [id, navigate]);
 
   /* ---------------- AI SPEAK QUESTION ---------------- */
   useEffect(() => {
-    if (!questions[current]) return;
+    if (!questions[current] || status === "completed") return;
 
     setTimer(45);
     setIsAISpeaking(true);
-    chunksRef.current = [];
     setIsRecording(false);
+    chunksRef.current = [];
 
     window.speechSynthesis.cancel();
 
@@ -49,7 +55,7 @@ export default function Interview() {
     speech.onend = () => setIsAISpeaking(false);
 
     window.speechSynthesis.speak(speech);
-  }, [questions, current]);
+  }, [questions, current, status]);
 
   /* ---------------- TIMER ---------------- */
   const startTimer = () => {
@@ -69,14 +75,15 @@ export default function Interview() {
 
   /* ---------------- RECORDING ---------------- */
   const startRecording = async () => {
-    if (isAISpeaking || isRecording) return;
+    if (isAISpeaking || isRecording || loading) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const options = { mimeType: "audio/webm;codecs=opus" };
-      const recorder = new MediaRecorder(stream, options);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
 
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
@@ -85,7 +92,7 @@ export default function Interview() {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      recorder.start(1000); // 1 sec chunks (smaller payload)
+      recorder.start(1000);
       setIsRecording(true);
       startTimer();
 
@@ -105,7 +112,7 @@ export default function Interview() {
     setIsRecording(false);
   };
 
-  /* ---------------- SUBMIT ---------------- */
+  /* ---------------- SUBMIT (EVALUATE) ---------------- */
   const submitAnswer = async () => {
     if (!chunksRef.current.length || loading) {
       alert("No recording detected.");
@@ -126,19 +133,54 @@ export default function Interview() {
     try {
       const res = await API.post("/interview/submit-audio", formData);
 
-      console.log("Gemini 2.5 Flash Response:", res.data);
-
-      if (current + 1 < questions.length) {
-        setCurrent((prev) => prev + 1);
-      } else {
+      if (res.data.status === "completed") {
         navigate(`/result/${id}`);
+        return;
       }
+
+      goToNext();
 
     } catch (error) {
       console.error("Submit error:", error);
-      alert("Submission failed.");
+      alert(error?.response?.data?.message || "Submission failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  /* ---------------- SKIP QUESTION ---------------- */
+  const skipQuestion = async () => {
+    if (loading) return;
+
+    stopRecording();
+    setLoading(true);
+
+    try {
+      const res = await API.post("/interview/skip-question", {
+        interviewId: id,
+        questionIndex: current,
+      });
+
+      if (res.data.status === "completed") {
+        navigate(`/result/${id}`);
+        return;
+      }
+
+      goToNext();
+
+    } catch (error) {
+      console.error("Skip error:", error);
+      alert(error?.response?.data?.message || "Skip failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goToNext = () => {
+    if (current + 1 < questions.length) {
+      setCurrent((prev) => prev + 1);
+    } else {
+      navigate(`/result/${id}`);
     }
   };
 
@@ -154,18 +196,20 @@ export default function Interview() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black to-gray-900 text-white p-8">
       <div className="w-full max-w-3xl bg-gray-800 p-10 rounded-2xl shadow-2xl">
 
-        <div className="text-right mb-4 text-green-400 font-semibold">
-          {isRecording && <p>Time Left: {timer}s</p>}
+        {/* PROGRESS */}
+        <div className="flex justify-between mb-6 text-sm text-gray-400">
+          <span>
+            Question {current + 1} / {questions.length}
+          </span>
+          {isRecording && <span className="text-green-400">Time: {timer}s</span>}
         </div>
 
+        {/* QUESTION */}
         <h3 className="text-2xl font-bold mb-4">
-          Question {current + 1}
+          {questions[current]}
         </h3>
 
-        <p className="text-lg mb-8 leading-relaxed">
-          {questions[current]}
-        </p>
-
+        {/* AI SPEAKING */}
         {isAISpeaking && (
           <div className="flex justify-center gap-2 mb-8">
             {[...Array(6)].map((_, i) => (
@@ -177,16 +221,18 @@ export default function Interview() {
           </div>
         )}
 
+        {/* RECORDING INDICATOR */}
         {isRecording && (
           <div className="text-center text-red-500 font-semibold mb-6 animate-pulse">
             ● Recording...
           </div>
         )}
 
-        <div className="flex justify-center gap-6">
+        {/* BUTTONS */}
+        <div className="flex justify-center gap-6 mt-6">
           <button
             onClick={startRecording}
-            disabled={isAISpeaking || isRecording}
+            disabled={isAISpeaking || isRecording || loading}
             className="px-6 py-3 bg-green-500 rounded-lg font-semibold disabled:opacity-50"
           >
             Start
@@ -207,11 +253,19 @@ export default function Interview() {
           >
             Submit
           </button>
+
+          <button
+            onClick={skipQuestion}
+            disabled={loading}
+            className="px-6 py-3 bg-red-600 rounded-lg font-semibold disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
 
         {loading && (
           <p className="text-center mt-6 text-green-400">
-            Processing with Gemini 2.5 Flash...
+            Processing...
           </p>
         )}
       </div>
