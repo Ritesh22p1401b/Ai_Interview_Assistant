@@ -1,29 +1,41 @@
 import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
 
-dotenv.config();
+/*
+  The API key is automatically read from:
+  process.env.GEMINI_API_KEY
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY missing in .env file");
-}
+  Make sure your .env contains:
+  GEMINI_API_KEY=your_key_here
+*/
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const ai = new GoogleGenAI({});
 
-/* ---------------------------------------------------------
-   Utility: Safe JSON Extractor
----------------------------------------------------------- */
+/* ======================================================
+   🔹 Utility: Safe JSON Extractor
+====================================================== */
 const extractJSON = (text) => {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No valid JSON found in Gemini response");
-  return JSON.parse(match[0]);
+  try {
+    const cleaned = text
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const match = cleaned.match(/\{[\s\S]*\}/);
+
+    if (!match) {
+      throw new Error("No JSON found in Gemini response");
+    }
+
+    return JSON.parse(match[0]);
+  } catch (error) {
+    throw new Error("Failed to parse Gemini JSON response");
+  }
 };
 
-/* ---------------------------------------------------------
-   1️⃣ Generate Resume-Based Questions
----------------------------------------------------------- */
-export const generateInterviewQuestions = async (resumeText) => {
+/* ======================================================
+   1️⃣ Generate Resume-Based Interview Questions
+====================================================== */
+export const generateQuestions = async (resumeText) => {
   try {
     if (!resumeText || resumeText.length < 50) {
       throw new Error("Resume text too short");
@@ -33,7 +45,7 @@ export const generateInterviewQuestions = async (resumeText) => {
 You are a senior technical interviewer.
 
 STRICT RULES:
-- Questions must directly reference tools, frameworks, or projects mentioned in the resume.
+- Questions must reference tools, frameworks, or projects mentioned in the resume.
 - Do NOT ask generic questions.
 - Do NOT number the questions.
 - Return ONLY raw JSON.
@@ -61,30 +73,33 @@ ${resumeText}
       temperature: 0.4,
     });
 
-    let text = response.text;
+    const text =
+      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      response?.text;
 
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    if (!text) {
+      throw new Error("Empty Gemini response");
+    }
 
     const parsed = extractJSON(text);
 
     return {
-      technical: parsed.technical.slice(0, 5),
-      project: parsed.project.slice(0, 3),
-      behavioral: parsed.behavioral.slice(0, 2),
+      technical: (parsed.technical || []).slice(0, 5),
+      project: (parsed.project || []).slice(0, 3),
+      behavioral: (parsed.behavioral || []).slice(0, 2),
     };
-
   } catch (error) {
-    console.error("Question Generation Error:", error.message);
+    console.error("Gemini Question Generation Error:", error.message);
     throw new Error("Gemini question generation failed");
   }
 };
 
-/* ---------------------------------------------------------
-   2️⃣ Evaluate Audio Answer
----------------------------------------------------------- */
+/* ======================================================
+   2️⃣ Evaluate Candidate Answer
+====================================================== */
 export const evaluateAnswer = async (question, transcript) => {
   try {
-    if (!transcript || transcript.length < 5) {
+    if (!transcript || transcript.trim().length < 5) {
       return {
         score: 0,
         feedback: "No meaningful answer detected.",
@@ -105,16 +120,14 @@ Evaluate the candidate's answer.
 Question:
 ${question}
 
-Candidate Answer (transcript):
+Candidate Answer:
 ${transcript}
 
-Evaluate based on:
-1. Technical accuracy (0-10)
-2. Communication clarity (0-10)
-3. Confidence (0-10)
-4. Relevance to question (0-10)
-
-Then compute an overall score (0-10).
+Score from 0-10 on:
+1. Technical accuracy
+2. Communication clarity
+3. Confidence
+4. Relevance
 
 Return ONLY valid JSON:
 
@@ -136,16 +149,32 @@ Return ONLY valid JSON:
       temperature: 0.3,
     });
 
-    let text = response.text;
+    const text =
+      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      response?.text;
 
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    if (!text) {
+      throw new Error("Empty Gemini response");
+    }
 
     const parsed = extractJSON(text);
 
-    return parsed;
-
+    // Defensive fallback
+    return {
+      score:
+        typeof parsed.score === "number"
+          ? Math.max(0, Math.min(10, parsed.score))
+          : 0,
+      feedback: parsed.feedback || "No feedback generated.",
+      breakdown: {
+        technicalAccuracy: parsed.breakdown?.technicalAccuracy ?? 0,
+        communication: parsed.breakdown?.communication ?? 0,
+        confidence: parsed.breakdown?.confidence ?? 0,
+        relevance: parsed.breakdown?.relevance ?? 0,
+      },
+    };
   } catch (error) {
-    console.error("Evaluation Error:", error.message);
+    console.error("Gemini Evaluation Error:", error.message);
 
     return {
       score: 0,

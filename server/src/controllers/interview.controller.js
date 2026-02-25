@@ -1,99 +1,127 @@
-import { transcribeAudio } from "../services/whisper.service.js";
-import { evaluateAnswer } from "../services/gemini.service.js";
+// controllers/interview.controller.js
 import { Interview } from "../models/Interview.model.js";
+import { generateQuestions, evaluateAnswer } from "../services/gemini.service.js";
+import { transcribeAudio } from "../services/whisper.service.js";
 import fs from "fs";
 
+/* ===================================================== */
+export const createInterview = async (req, res) => {
+  try {
+    const { resumeText } = req.body;
 
-// ==========================================
-// 🔹 GET Interview By ID (Fixes 404 issue)
-// ==========================================
+    if (!resumeText || resumeText.length < 20) {
+      return res.status(400).json({ message: "Valid resume text required" });
+    }
+
+    const { technical, project, behavioral } =
+      await generateQuestions(resumeText);
+
+    const interview = await Interview.create({
+      user: req.user._id,
+      resumeText,
+      questions: { technical, project, behavioral },
+      allQuestions: [...technical, ...project, ...behavioral],
+      status: "in-progress",
+    });
+
+    res.status(201).json({
+      message: "Interview created successfully",
+      interviewId: interview._id,
+      questions: interview.allQuestions,
+    });
+
+  } catch (error) {
+    console.error("Create Interview Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* ===================================================== */
 export const getInterviewById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const interview = await Interview.findById(id);
+    const interview = await Interview.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
 
-    res.status(200).json(interview);
+    res.json(interview);
 
   } catch (error) {
-    console.error("Get Interview Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
-// ==========================================
-// 🔹 Submit Audio Answer
-// ==========================================
+/* ===================================================== */
 export const submitAnswerAudio = async (req, res) => {
   try {
     const { interviewId, questionIndex } = req.body;
 
     if (!req.file) {
-      return res.status(400).json({ message: "Audio file is required" });
+      return res.status(400).json({ message: "Audio file required" });
     }
 
-    const filePath = req.file.path;
-
-    // Validate interview
-    const interview = await Interview.findById(interviewId);
+    const interview = await Interview.findOne({
+      _id: interviewId,
+      user: req.user._id,
+    });
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
 
-    // Validate question index
     if (
-      questionIndex === undefined ||
       questionIndex < 0 ||
-      questionIndex >= interview.questions.length
+      questionIndex >= interview.allQuestions.length
     ) {
       return res.status(400).json({ message: "Invalid question index" });
     }
 
-    const question = interview.questions[questionIndex];
+    const question = interview.allQuestions[questionIndex];
+    const filePath = req.file.path;
 
-    // 🔹 1. Transcribe Audio
     const transcript = await transcribeAudio(filePath);
-
-    // 🔹 2. Evaluate Answer
     const evaluation = await evaluateAnswer(question, transcript);
 
-    // 🔹 3. Save Answer
     interview.answers.push({
       question,
+      category: detectCategory(interview, question),
       audioUrl: filePath,
       transcript,
-      score: evaluation.score,
-      feedback: evaluation.feedback,
+      score: evaluation?.score || 0,
+      feedback: evaluation?.feedback || "",
     });
 
-    interview.totalScore =
-      (interview.totalScore || 0) + (evaluation.score || 0);
+    interview.totalScore += evaluation?.score || 0;
+
+    if (interview.answers.length === interview.allQuestions.length) {
+      interview.status = "completed";
+    }
 
     await interview.save();
 
-    // 🔹 4. Delete temp file safely
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    res.status(200).json({
+    res.json({
       transcript,
-      score: evaluation.score,
-      feedback: evaluation.feedback,
+      score: evaluation?.score || 0,
+      feedback: evaluation?.feedback || "",
       totalScore: interview.totalScore,
+      status: interview.status,
     });
 
   } catch (error) {
-    console.error("Submit Audio Error:", error);
-    res.status(500).json({
-      message: "Error processing audio",
-      error: error.message,
-    });
+    console.error("Audio Submit Error:", error);
+    res.status(500).json({ message: "Audio processing error" });
   }
+};
+
+const detectCategory = (interview, question) => {
+  if (interview.questions.technical.includes(question)) return "technical";
+  if (interview.questions.project.includes(question)) return "project";
+  if (interview.questions.behavioral.includes(question)) return "behavioral";
+  return "technical";
 };

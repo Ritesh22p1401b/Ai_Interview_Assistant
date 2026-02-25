@@ -1,17 +1,19 @@
 import express from "express";
-import { 
+import {
+  createInterview,
+  getInterviewById,
   submitAnswerAudio,
-  getInterviewById 
 } from "../controllers/interview.controller.js";
-import { uploadAudio } from "../middlewares/audioUpload.js";
+
 import { protect } from "../middlewares/auth.middleware.js";
+import { uploadAudio } from "../middlewares/audioUpload.js";
 
 const router = express.Router();
 
-// 🔹 Get interview by ID
+router.post("/create", protect, createInterview);
+
 router.get("/:id", protect, getInterviewById);
 
-// 🔹 Submit audio answer
 router.post(
   "/submit-audio",
   protect,
