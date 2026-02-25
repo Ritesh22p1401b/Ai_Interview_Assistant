@@ -7,6 +7,8 @@ const UploadResume = () => {
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [message, setMessage] = useState("");
+  const [interviewId, setInterviewId] = useState(null);
+
   const navigate = useNavigate();
 
   const validateFile = (selectedFile) => {
@@ -17,12 +19,12 @@ const UploadResume = () => {
     ];
 
     if (!allowedTypes.includes(selectedFile.type)) {
-      setMessage("Only PDF, DOC, DOCX files are allowed.");
+      alert("Only PDF, DOC, DOCX files are allowed.");
       return false;
     }
 
     if (selectedFile.size > 5 * 1024 * 1024) {
-      setMessage("File size must be less than 5MB.");
+      alert("File size must be less than 5MB.");
       return false;
     }
 
@@ -37,43 +39,56 @@ const UploadResume = () => {
     }
   };
 
+  /* ---------------- UPLOAD RESUME ---------------- */
   const handleUpload = async () => {
     if (!file || loading) return;
 
     try {
       setLoading(true);
       setMessage("Uploading resume...");
-      
+
       const formData = new FormData();
-      formData.append("resume", file);
+      formData.append("file", file); // ✅ must match backend
 
-      const response = await API.post(
-        "/resume/upload",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await API.post("/resume/upload", formData);
 
-      setMessage("Analyzing resume & generating questions...");
+      const id = response.data.interviewId;
 
-      // Small UX delay for smoother transition
-      setTimeout(() => {
-        navigate(`/interview/${response.data.interviewId}`);
-      }, 1200);
+      if (!id) {
+        alert("Interview creation failed.");
+        return;
+      }
+
+      setInterviewId(id);
+      setMessage("Resume uploaded successfully.");
+
+      // ✅ SUCCESS ALERT
+      alert(`${file.name} uploaded successfully!`);
 
     } catch (error) {
       console.error(error);
 
-      if (error.response?.status === 401) {
-        setMessage("Session expired. Please login again.");
-      } else {
-        setMessage(error?.response?.data?.message || "Upload failed.");
-      }
+      const errorMsg =
+        error?.response?.data?.message || "Upload failed.";
+
+      setMessage(errorMsg);
+
+      // ❌ FAILURE ALERT
+      alert(`Failed to upload ${file?.name || "file"}.\n${errorMsg}`);
 
     } finally {
       setLoading(false);
     }
+  };
+
+  /* ---------------- START INTERVIEW ---------------- */
+  const handleStartInterview = () => {
+    if (!interviewId) {
+      alert("Please upload resume first.");
+      return;
+    }
+
+    navigate(`/interview/${interviewId}`);
   };
 
   return (
@@ -100,21 +115,31 @@ const UploadResume = () => {
           type="file"
           accept=".pdf,.doc,.docx"
           onChange={(e) => handleFileSelect(e.target.files[0])}
-          className="mb-6"
           disabled={loading}
+          className="mb-6"
         />
 
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-gray-400 mb-6">
           Drag & drop your resume here or select file
         </p>
 
-        <button
-          onClick={handleUpload}
-          disabled={loading || !file}
-          className="px-6 py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-50"
-        >
-          {loading ? "Processing..." : "Upload & Start Interview"}
-        </button>
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={handleUpload}
+            disabled={loading || !file}
+            className="px-6 py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-50"
+          >
+            {loading ? "Uploading..." : "Upload Resume"}
+          </button>
+
+          <button
+            onClick={handleStartInterview}
+            disabled={!interviewId}
+            className="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg hover:scale-105 transition disabled:opacity-50"
+          >
+            Start Interview
+          </button>
+        </div>
       </div>
 
       {file && (

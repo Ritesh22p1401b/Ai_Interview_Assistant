@@ -13,19 +13,17 @@ export default function Interview() {
   const [score, setScore] = useState(null);
   const [feedback, setFeedback] = useState("");
 
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioBlob, setAudioBlob] = useState(null);
-  const [recordingStart, setRecordingStart] = useState(null);
-
+  const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
+  const streamRef = useRef(null);
 
   /* ---------------- FETCH INTERVIEW ---------------- */
   useEffect(() => {
     const fetchInterview = async () => {
       try {
         const res = await API.get(`/interview/${id}`);
-        setQuestions(res.data.questions || []);
+        setQuestions(res.data.allQuestions || []);
       } catch (error) {
         console.error("Fetch interview error:", error);
       }
@@ -36,10 +34,10 @@ export default function Interview() {
 
   /* ---------------- SPEECH ---------------- */
   useEffect(() => {
-    if (questions.length && questions[current]) {
+    if (questions[current]) {
+      window.speechSynthesis.cancel();
       const speech = new SpeechSynthesisUtterance(questions[current]);
       speech.lang = "en-US";
-      window.speechSynthesis.cancel();
       window.speechSynthesis.speak(speech);
     }
   }, [questions, current]);
@@ -67,49 +65,52 @@ export default function Interview() {
   /* ---------------- RECORDING ---------------- */
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+
     const recorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = recorder;
 
     recorder.ondataavailable = e => {
       chunksRef.current.push(e.data);
     };
 
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-      setAudioBlob(blob);
-      chunksRef.current = [];
-    };
-
     recorder.start();
-    setRecordingStart(Date.now());
-    setMediaRecorder(recorder);
   };
 
   const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
+    if (mediaRecorderRef.current?.state !== "inactive") {
+      mediaRecorderRef.current.stop();
     }
+
+    streamRef.current?.getTracks().forEach(track => track.stop());
   };
 
   /* ---------------- SUBMIT ---------------- */
   const submitAnswer = async () => {
-    if (!audioBlob || loading) return;
+    if (!chunksRef.current.length || loading) return;
 
     setLoading(true);
 
-    const duration =
-      recordingStart ? Math.floor((Date.now() - recordingStart) / 1000) : 0;
+    const blob = new Blob(chunksRef.current, {
+      type: "audio/webm",
+    });
+
+    chunksRef.current = [];
 
     const formData = new FormData();
-    formData.append("audio", audioBlob);
+    formData.append("audio", blob, "recording.webm");
     formData.append("interviewId", id);
     formData.append("questionIndex", current);
-    formData.append("audioDuration", duration);
 
     try {
-      const res = await API.post("/interview/submit-audio", formData);
+      const res = await API.post(
+        "/interview/submit-audio",
+        formData
+      );
 
       setScore(res.data.score);
       setFeedback(res.data.feedback);
+
     } catch (err) {
       console.error("Submit error:", err);
     } finally {
@@ -124,12 +125,9 @@ export default function Interview() {
 
   const handleNext = () => {
     clearInterval(timerRef.current);
-
     setTimer(60);
     setScore(null);
     setFeedback("");
-    setAudioBlob(null);
-    setRecordingStart(null);
 
     if (current + 1 < questions.length) {
       setCurrent(prev => prev + 1);
