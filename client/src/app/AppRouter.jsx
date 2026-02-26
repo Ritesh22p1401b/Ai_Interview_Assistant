@@ -10,6 +10,8 @@ import Interview from "../pages/Interview";
 import Result from "../pages/Result";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
+import DesignLab from "../pages/DesignLab";
+
 
 export default function AppRouter() {
   return (
@@ -22,6 +24,7 @@ export default function AppRouter() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/design-lab" element={<DesignLab />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
