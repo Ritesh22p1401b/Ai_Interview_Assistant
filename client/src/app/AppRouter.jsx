@@ -24,7 +24,7 @@ export default function AppRouter() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/design-lab" element={<DesignLab />} />
+        <Route path="/designlab" element={<DesignLab />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
