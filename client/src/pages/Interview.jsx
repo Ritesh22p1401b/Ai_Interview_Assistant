@@ -3,14 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../services/axios";
 import AISphere from "../components/AISphere";
 
-
 export default function Interview() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
   const [current, setCurrent] = useState(0);
-  const [timer, setTimer] = useState(45);
+  const [timer, setTimer] = useState(60); 
   const [isRecording, setIsRecording] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,17 +20,13 @@ export default function Interview() {
   const timerRef = useRef(null);
   const streamRef = useRef(null);
 
-  /* ---------------- FETCH INTERVIEW ---------------- */
   useEffect(() => {
     const fetchInterview = async () => {
       try {
         const res = await API.get(`/interview/${id}`);
         setQuestions(res.data.allQuestions || []);
         setStatus(res.data.status || "in-progress");
-
-        if (res.data.status === "completed") {
-          navigate(`/result/${id}`);
-        }
+        if (res.data.status === "completed") navigate(`/result/${id}`);
       } catch (error) {
         console.error("Fetch error:", error);
       }
@@ -39,30 +34,22 @@ export default function Interview() {
     fetchInterview();
   }, [id, navigate]);
 
-  /* ---------------- AI SPEAK QUESTION ---------------- */
   useEffect(() => {
     if (!questions[current] || status === "completed") return;
-
-    setTimer(45);
+    setTimer(60);
+    clearInterval(timerRef.current);
     setIsAISpeaking(true);
     setIsRecording(false);
     chunksRef.current = [];
-
     window.speechSynthesis.cancel();
-
     const speech = new SpeechSynthesisUtterance(questions[current]);
     speech.lang = "en-US";
-    speech.rate = 1;
-
     speech.onend = () => setIsAISpeaking(false);
-
     window.speechSynthesis.speak(speech);
   }, [questions, current, status]);
 
-  /* ---------------- TIMER ---------------- */
   const startTimer = () => {
     clearInterval(timerRef.current);
-
     timerRef.current = setInterval(() => {
       setTimer((prev) => {
         if (prev <= 1) {
@@ -75,115 +62,71 @@ export default function Interview() {
     }, 1000);
   };
 
-  /* ---------------- RECORDING ---------------- */
   const startRecording = async () => {
     if (isAISpeaking || isRecording || loading) return;
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-      });
-
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.start(1000);
       setIsRecording(true);
-      startTimer();
-
+      startTimer(); 
     } catch (err) {
       alert("Microphone permission denied.");
-      console.error(err);
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     clearInterval(timerRef.current);
     setIsRecording(false);
   };
 
-  /* ---------------- SUBMIT (EVALUATE) ---------------- */
   const submitAnswer = async () => {
     if (!chunksRef.current.length || loading) {
       alert("No recording detected.");
       return;
     }
-
     stopRecording();
     setLoading(true);
-
     const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-    chunksRef.current = [];
-
     const formData = new FormData();
     formData.append("audio", blob, "answer.webm");
     formData.append("interviewId", id);
     formData.append("questionIndex", current);
-
     try {
       const res = await API.post("/interview/submit-audio", formData);
-
-      if (res.data.status === "completed") {
-        navigate(`/result/${id}`);
-        return;
-      }
-
-      goToNext();
-
+      if (res.data.status === "completed") navigate(`/result/${id}`);
+      else goToNext();
     } catch (error) {
-      console.error("Submit error:", error);
-      alert(error?.response?.data?.message || "Submission failed.");
+      alert("Submission failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ---------------- SKIP QUESTION ---------------- */
   const skipQuestion = async () => {
     if (loading) return;
-
     stopRecording();
     setLoading(true);
-
     try {
-      const res = await API.post("/interview/skip-question", {
-        interviewId: id,
-        questionIndex: current,
-      });
-
-      if (res.data.status === "completed") {
-        navigate(`/result/${id}`);
-        return;
-      }
-
-      goToNext();
-
+      const res = await API.post("/interview/skip-question", { interviewId: id, questionIndex: current });
+      if (res.data.status === "completed") navigate(`/result/${id}`);
+      else goToNext();
     } catch (error) {
-      console.error("Skip error:", error);
-      alert(error?.response?.data?.message || "Skip failed.");
+      alert("Skip failed.");
     } finally {
       setLoading(false);
     }
   };
 
   const goToNext = () => {
-    if (current + 1 < questions.length) {
-      setCurrent((prev) => prev + 1);
-    } else {
-      navigate(`/result/${id}`);
-    }
+    if (current + 1 < questions.length) setCurrent((prev) => prev + 1);
+    else navigate(`/result/${id}`);
   };
 
   const handleAutoSubmit = () => {
@@ -191,99 +134,88 @@ export default function Interview() {
     setTimeout(() => submitAnswer(), 300);
   };
 
-  if (!questions.length)
-    return <p className="text-center mt-20">Loading Interview...</p>;
+  if (!questions.length) return <p className="text-center mt-20 text-cyan-400">Loading Interview...</p>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#050b18] via-black to-[#020611] text-white flex flex-col">
+    <div className="h-[calc(100vh-48px)] bg-[#0b0f0c] text-white flex flex-col overflow-hidden">
 
-      {/* ================= TOP QUESTION ================= */}
-      <div className="pt-10 px-8 text-center">
-        <div className="flex justify-between text-sm text-blue-300 mb-4 opacity-70">
-          <span>
-            Question {current + 1} / {questions.length}
-          </span>
-
-          {isRecording && (
-            <span className="text-cyan-400 font-medium tracking-wider">
+      {/* 1. TOP SECTION: Question & Meta */}
+      <div className="h-[20%] flex flex-col justify-end px-8 pb-4 text-center">
+        <div className="flex justify-between items-center max-w-4xl mx-auto w-full text-sm font-mono tracking-widest mb-4">
+          
+          {/* Question Number - Same color as question */}
+          <div className="flex items-center gap-2 bg-cyan-950/30 px-4 py-1 rounded-full border border-cyan-800/50">
+            <span className="text-cyan-400 font-bold">{current + 1}</span>
+            <span className="text-cyan-400/40">/</span>
+            <span className="text-cyan-400/70">{questions.length}</span>
+          </div>
+          
+          {/* Timer - Same color as question */}
+          <div className="flex items-center gap-3">
+            <span className={`text-xl ${isRecording ? "text-red-500 font-bold animate-pulse" : "text-cyan-400"}`}>
               {timer}s
             </span>
-          )}
+            <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-cyan-800'}`}></div>
+          </div>
         </div>
-
-        <h2 className="text-2xl md:text-3xl font-light leading-relaxed max-w-4xl mx-auto tracking-wide">
-          {questions[current]}
+        
+        {/* Question Text */}
+        <h2 className="text-xl md:text-2xl font-medium max-w-4xl mx-auto leading-relaxed text-cyan-100 italic">
+          "{questions[current]}"
         </h2>
       </div>
 
-      {/* ================= AI SPHERE ================= */}
-      <div className="flex-1 flex items-center justify-center relative">
-
-        {/* Glow Aura Behind Sphere */}
-        <div className="absolute w-[500px] h-[500px] bg-cyan-500/10 blur-3xl rounded-full" />
-
+      {/* 2. MIDDLE SECTION: AI Sphere */}
+      <div className="h-[55%] w-full relative">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[70%] h-[70%] bg-cyan-500/5 blur-[100px] rounded-full"></div>
+        </div>
         <AISphere isSpeaking={isAISpeaking} />
       </div>
 
-      {/* ================= STATUS TEXT ================= */}
-      <div className="text-center mb-6">
-        {isAISpeaking && (
-          <p className="text-cyan-400 tracking-widest text-sm animate-pulse">
-            AI SPEAKING...
-          </p>
-        )}
+      {/* 3. BOTTOM SECTION: Status & Controls */}
+      <div className="h-[25%] flex flex-col justify-start items-center pt-2">
+        <div className="h-4 mb-10">
+          {isAISpeaking && (
+            <p className="text-cyan-400 text-[10px] font-bold tracking-[0.5em] uppercase animate-pulse">
+              AI Interviewer Speaking
+            </p>
+          )}
+          {isRecording && (
+            <p className="text-red-500 text-[10px] font-bold tracking-[0.5em] uppercase animate-pulse">
+              Recording Your Response
+            </p>
+          )}
+        </div>
 
-        {isRecording && (
-          <p className="text-red-400 tracking-widest text-sm animate-pulse">
-            ● RECORDING
-          </p>
-        )}
+        <div className="flex items-center gap-10">
+          {/* Start Button */}
+          <button
+            onClick={startRecording}
+            disabled={isAISpeaking || isRecording || loading}
+            className="w-16 h-16 rounded-full border border-cyan-800 flex flex-col items-center justify-center text-[10px] font-bold uppercase text-cyan-400 hover:bg-cyan-400 hover:text-black transition-all disabled:opacity-10 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(0,255,255,0.1)]"
+          >
+            Start
+          </button>
 
-        {loading && (
-          <p className="text-cyan-300 tracking-widest text-sm">
-            Processing Answer...
-          </p>
-        )}
-      </div>
+          {/* Submit Button */}
+          <button
+            onClick={submitAnswer}
+            disabled={loading || !isRecording}
+            className="px-14 py-4 bg-cyan-500 text-black rounded-full font-black text-xs tracking-[0.2em] hover:bg-cyan-400 hover:scale-105 transition-all active:scale-95 disabled:opacity-20 shadow-[0_0_30px_rgba(0,255,255,0.2)]"
+          >
+            SUBMIT ANSWER
+          </button>
 
-      {/* ================= CONTROLS ================= */}
-      <div className="pb-10 flex justify-center gap-6">
-
-        <button
-          onClick={startRecording}
-          disabled={isAISpeaking || isRecording || loading}
-          className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg font-medium tracking-wide 
-                    hover:scale-105 transition disabled:opacity-40"
-        >
-          Start
-        </button>
-
-        <button
-          onClick={stopRecording}
-          disabled={!isRecording}
-          className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg font-medium tracking-wide 
-                    hover:scale-105 transition disabled:opacity-40"
-        >
-          Stop
-        </button>
-
-        <button
-          onClick={submitAnswer}
-          disabled={loading}
-          className="px-6 py-3 bg-gradient-to-r from-blue-700 to-indigo-700 rounded-lg font-medium tracking-wide 
-                    hover:scale-105 transition disabled:opacity-40"
-        >
-          Submit
-        </button>
-
-        <button
-          onClick={skipQuestion}
-          disabled={loading}
-          className="px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 rounded-lg font-medium tracking-wide 
-                    hover:scale-105 transition disabled:opacity-40"
-        >
-          Next
-        </button>
+          {/* Skip/Next Button */}
+          <button
+            onClick={skipQuestion}
+            disabled={loading}
+            className="w-16 h-16 rounded-full border border-cyan-800 flex flex-col items-center justify-center text-[10px] font-bold uppercase text-cyan-400 hover:border-red-500 hover:text-red-500 transition-all disabled:opacity-10 shadow-[0_0_15px_rgba(0,255,255,0.1)]"
+          >
+            Skip
+          </button>
+        </div>
       </div>
     </div>
   );
