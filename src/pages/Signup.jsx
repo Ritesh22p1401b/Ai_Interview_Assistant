@@ -52,7 +52,7 @@ export default function Signup() {
 
     try {
       const response = await API.post(
-        "/auth/register",
+        "/auth/signup",
         {
           name: form.name.trim(),
           email: form.email.trim().toLowerCase(),
@@ -64,7 +64,7 @@ export default function Signup() {
       // expects { token, user }
       await signup(response.data);
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError(
         err.response?.data?.message ||
