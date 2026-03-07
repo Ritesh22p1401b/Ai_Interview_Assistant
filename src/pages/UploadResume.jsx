@@ -47,22 +47,22 @@ const UploadResume = () => {
      UPLOAD RESUME
   ========================= */
   const handleUpload = async () => {
-    if (!file || loading) return;
+    if (!file || loading) {
+      alert("Please select a file first.");
+      return;
+    }
 
     try {
       setLoading(true);
       setMessage("Uploading resume...");
 
       const formData = new FormData();
-      formData.append("file", file); // must match backend
+      formData.append("file", file);
 
-      const response = await API.post("/resume/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      // ❗ Do NOT manually set Content-Type
+      const response = await API.post("/resume/upload", formData);
 
-      const { interviewId, questions } = response.data;
+      const { interviewId, questions } = response.data || {};
 
       if (!interviewId) {
         throw new Error("Interview creation failed.");
@@ -82,7 +82,9 @@ const UploadResume = () => {
       console.error("Upload Error:", error);
 
       const errorMsg =
-        error?.response?.data?.message || "Upload failed.";
+        error?.response?.data?.message ||
+        error.message ||
+        "Upload failed.";
 
       setMessage(errorMsg);
       alert(`Failed to upload ${file?.name || "file"}.\n${errorMsg}`);
@@ -122,7 +124,9 @@ const UploadResume = () => {
         onDrop={(e) => {
           e.preventDefault();
           setDragActive(false);
-          handleFileSelect(e.dataTransfer.files[0]);
+
+          const droppedFile = e.dataTransfer.files?.[0];
+          handleFileSelect(droppedFile);
         }}
         className={`border-2 border-dashed p-10 rounded-xl w-[420px] text-center bg-black/40 backdrop-blur-md transition
         ${dragActive ? "border-green-500 bg-black/60" : "border-green-400"}`}
@@ -130,7 +134,7 @@ const UploadResume = () => {
         <input
           type="file"
           accept=".pdf,.doc,.docx"
-          onChange={(e) => handleFileSelect(e.target.files[0])}
+          onChange={(e) => handleFileSelect(e.target.files?.[0])}
           disabled={loading}
           className="mb-6"
         />
