@@ -2,7 +2,7 @@
 import Resume from "../models/Resume.model.js";
 import { Interview } from "../models/Interview.model.js";
 import { generateQuestions } from "../services/gemini.service.js";
-import { extractResumeText } from "../utils/resumeParser.js";
+import { extractResumeText } from "../services/resumeParser.js";
 
 export const uploadResume = async (req, res) => {
   try {
