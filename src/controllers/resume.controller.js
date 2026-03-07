@@ -1,8 +1,8 @@
 // controllers/resume.controller.js
-import fs from "fs";
 import Resume from "../models/Resume.model.js";
 import { Interview } from "../models/Interview.model.js";
 import { generateQuestions } from "../services/gemini.service.js";
+import { extractResumeText } from "../utils/resumeParser.js";
 
 export const uploadResume = async (req, res) => {
   try {
@@ -16,9 +16,8 @@ export const uploadResume = async (req, res) => {
 
     const filePath = req.file.path;
 
-    // Keep your existing extraction logic
-    const extractedText =
-      fs.readFileSync(filePath, "utf8") || "Resume content";
+    // ✅ Use proper resume parser instead of fs.readFileSync
+    const extractedText = await extractResumeText(filePath);
 
     if (!extractedText || extractedText.length < 20) {
       return res.status(400).json({
@@ -62,6 +61,7 @@ export const uploadResume = async (req, res) => {
       interviewId: interview._id,
       questions: interview.allQuestions,
     });
+
   } catch (error) {
     console.error("Resume Upload Error:", error);
 

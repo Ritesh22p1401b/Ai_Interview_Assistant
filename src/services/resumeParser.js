@@ -3,6 +3,10 @@ import pdfParse from "pdf-parse";
 
 export const extractResumeText = async (filePath) => {
   try {
+    if (!filePath) {
+      throw new Error("File path is missing");
+    }
+
     if (!fs.existsSync(filePath)) {
       throw new Error("File does not exist");
     }
@@ -11,13 +15,18 @@ export const extractResumeText = async (filePath) => {
 
     const data = await pdfParse(buffer);
 
-    if (!data.text || data.text.trim().length < 20) {
+    const text = data?.text?.trim();
+
+    if (!text || text.length < 20) {
       throw new Error("PDF contains no readable text");
     }
 
-    return data.text.trim();
+    return text;
+
   } catch (error) {
-    console.error("PDF Parsing Error:", error.message);
-    throw new Error("Failed to parse PDF");
+    console.error("Resume Parsing Error:", error);
+
+    // Send clearer message to controller
+    throw new Error(error.message || "Resume parsing failed");
   }
 };
