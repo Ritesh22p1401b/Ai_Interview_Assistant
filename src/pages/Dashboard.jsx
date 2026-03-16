@@ -9,16 +9,14 @@ import SkillRadar from "../components/dashboard/SkillRadar";
 import InterviewTable from "../components/dashboard/InterviewTable";
 
 const Dashboard = () => {
-
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState({});
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-
     if (!isAuthenticated) {
       setLoading(false);
       return;
@@ -26,22 +24,24 @@ const Dashboard = () => {
 
     async function loadDashboard() {
       try {
+        const [analyticsRes, resultsRes] = await Promise.all([
+          API.get("/dashboard/analytics"),
+          API.get("/dashboard/results"),
+        ]);
 
-        const analyticsRes = await API.get("/dashboard/analytics");
-        const resultsRes = await API.get("/dashboard/results");
-
-        setAnalytics(analyticsRes.data);
-        setResults(resultsRes.data);
-
+        setAnalytics(analyticsRes.data || {});
+        setResults(resultsRes.data || []);
       } catch (err) {
-        console.error("Dashboard load error:", err);
+        console.error(
+          "Dashboard load error:",
+          err.response?.data || err.message
+        );
       } finally {
         setLoading(false);
       }
     }
 
     loadDashboard();
-
   }, [isAuthenticated]);
 
   /* -------------------- NOT LOGGED IN -------------------- */
@@ -49,7 +49,6 @@ const Dashboard = () => {
   if (!isAuthenticated) {
     return (
       <section className="flex flex-col items-center justify-center text-center px-6 py-32 relative overflow-hidden">
-
         <div className="absolute w-[600px] h-[600px] bg-green-400/20 blur-[150px] rounded-full top-20"></div>
 
         <h1 className="text-4xl md:text-6xl font-bold max-w-3xl">
@@ -57,8 +56,8 @@ const Dashboard = () => {
         </h1>
 
         <p className="mt-6 text-gray-400 max-w-xl text-lg">
-          Your interview analytics, performance graphs,
-          and AI feedback will appear here.
+          Your interview analytics, performance graphs, and AI feedback will
+          appear here.
         </p>
 
         <button
@@ -67,7 +66,6 @@ const Dashboard = () => {
         >
           Login First
         </button>
-
       </section>
     );
   }
@@ -86,12 +84,9 @@ const Dashboard = () => {
 
   return (
     <section className="relative px-6 py-20 overflow-hidden">
-
-      {/* Glow background */}
       <div className="absolute w-[700px] h-[700px] bg-green-400/20 blur-[150px] rounded-full top-0 left-1/2 -translate-x-1/2"></div>
 
       <div className="relative max-w-7xl mx-auto space-y-12">
-
         <h1 className="text-4xl md:text-5xl font-extrabold text-center">
           AI Interview <span className="text-green-400">Dashboard</span>
         </h1>
@@ -99,17 +94,15 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <StatsCards analytics={analytics} />
 
-        {/* Graph Section */}
+        {/* Charts */}
         <div className="grid md:grid-cols-2 gap-8">
-          <TrendChart data={analytics.trend} />
-          <SkillRadar data={analytics.segmentScores} />
+          <TrendChart data={analytics?.trend || []} />
+          <SkillRadar data={analytics?.segmentScores || {}} />
         </div>
 
         {/* Interview History */}
         <InterviewTable results={results} />
-
       </div>
-
     </section>
   );
 };
