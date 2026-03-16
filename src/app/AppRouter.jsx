@@ -11,7 +11,6 @@ import Result from "../pages/Result";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Layout from "../components/Layout";
 import DesignLab from "../pages/DesignLab";
-import InterviewReport from "../pages/InterviewReport";
 
 
 export default function AppRouter() {
@@ -33,7 +32,6 @@ export default function AppRouter() {
           <Route path="/upload" element={<UploadResume />} />
           <Route path="/interview/:id" element={<Interview />} />
           <Route path="/result/:id" element={<Result />} />
-          <Route path="/report/:id" element={<InterviewReport />} />
         </Route>
 
       </Route>

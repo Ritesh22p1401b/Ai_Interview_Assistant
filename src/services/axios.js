@@ -1,14 +1,8 @@
 import axios from "axios";
 
-// const instance = axios.create({
-//   baseURL: "http://localhost:5000/api", // adjust if needed
-// });
-
-
 const instance = axios.create({
   baseURL: "https://backend-req0.onrender.com/api", 
 });
-
 
 // Attach token automatically
 instance.interceptors.request.use((config) => {
