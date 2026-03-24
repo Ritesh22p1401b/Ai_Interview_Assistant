@@ -7,15 +7,11 @@ An AI-powered interview platform that generates personalized interview questions
 ## 📸 Project Preview
 
 <p align="center">
-  <img src="assets/dashboard.png" alt="Dashboard" width="800"/>
+  <img src="assets/pic2.png" alt="Dashboard" width="800"/>
 </p>
 
 <p align="center">
-  <img src="assets/interview.png" alt="Interview Interface" width="800"/>
-</p>
-
-<p align="center">
-  <img src="assets/report.png" alt="AI Evaluation Report" width="800"/>
+  <img src="assets/pic1.png" alt="Interview Interface" width="800"/>
 </p>
 
 ---
