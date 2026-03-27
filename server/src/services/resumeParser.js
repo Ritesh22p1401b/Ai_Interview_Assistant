@@ -3,29 +3,34 @@ import { PDFParse } from "pdf-parse";
 
 export const extractResumeText = async (filePath) => {
   try {
-    console.log("Parsing file at path:", filePath);
+    if (!filePath) {
+      throw new Error("File path missing");
+    }
 
     if (!fs.existsSync(filePath)) {
-      throw new Error("File does not exist");
+      throw new Error("Resume file not found");
     }
 
+    // Read uploaded resume
     const buffer = fs.readFileSync(filePath);
 
-    console.log("File size:", buffer.length);
-
-    // ✅ pdf-parse v2 usage
+    // Initialize parser with buffer
     const parser = new PDFParse({ data: buffer });
 
+    // Extract text
     const result = await parser.getText();
 
-    if (!result.text || result.text.trim().length === 0) {
-      throw new Error("PDF has no readable text");
+    const text = result?.text?.trim();
+
+    if (!text || text.length < 20) {
+      throw new Error("PDF contains no readable text");
     }
 
-    return result.text;
+    return text;
 
   } catch (error) {
-    console.error("PDF Parsing Error:", error.message);
-    throw new Error("Failed to parse PDF");
+    console.error("Resume Parsing Error:", error);
+
+    throw new Error(error.message || "Resume parsing failed");
   }
 };

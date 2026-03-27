@@ -1,8 +1,8 @@
 // controllers/resume.controller.js
-import fs from "fs";
 import Resume from "../models/Resume.model.js";
 import { Interview } from "../models/Interview.model.js";
 import { generateQuestions } from "../services/gemini.service.js";
+import { extractResumeText } from "../services/resumeParser.js";
 
 export const uploadResume = async (req, res) => {
   try {
@@ -16,8 +16,8 @@ export const uploadResume = async (req, res) => {
 
     const filePath = req.file.path;
 
-    // 🔥 Replace this with real PDF/DOC extraction logic
-    const extractedText = fs.readFileSync(filePath, "utf8") || "Resume content";
+    // ✅ Use proper resume parser instead of fs.readFileSync
+    const extractedText = await extractResumeText(filePath);
 
     if (!extractedText || extractedText.length < 20) {
       return res.status(400).json({
@@ -25,7 +25,7 @@ export const uploadResume = async (req, res) => {
       });
     }
 
-    // 1️⃣ Save resume
+    // Save resume
     const resume = await Resume.create({
       userId: req.user._id,
       fileName: req.file.originalname,
@@ -33,17 +33,27 @@ export const uploadResume = async (req, res) => {
       extractedText,
     });
 
-    // 2️⃣ Generate AI questions
+    // Generate questions
     const { technical, project, behavioral } =
       await generateQuestions(extractedText);
 
-    // 3️⃣ Create interview
+    const allQuestions = [...technical, ...project, ...behavioral];
+
+    if (allQuestions.length === 0) {
+      return res.status(500).json({
+        message: "AI failed to generate questions",
+      });
+    }
+
+    // Create interview
     const interview = await Interview.create({
       user: req.user._id,
       resumeText: extractedText,
       questions: { technical, project, behavioral },
-      allQuestions: [...technical, ...project, ...behavioral],
+      allQuestions,
       status: "in-progress",
+      answers: [],
+      totalScore: 0,
     });
 
     return res.status(201).json({

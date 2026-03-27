@@ -1,5 +1,3 @@
-// server/src/app.js
-
 import express from "express";
 import session from "express-session";
 import passport from "passport";
@@ -14,8 +12,13 @@ import { configurePassport } from "./config/passport.js";
 import authRoutes from "./routes/auth.routes.js";
 import resumeRoutes from "./routes/resume.routes.js";
 import interviewRoutes from "./routes/interview.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+
 
 const app = express();
+
+/* ------------------ TRUST PROXY (Required for Render HTTPS) ------------------ */
+app.set("trust proxy", 1);
 
 /* ------------------ SECURITY ------------------ */
 app.use(helmet());
@@ -25,10 +28,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ------------------ CORS ------------------ */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ai-intervie.netlify.app"
+];
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true
   })
 );
 
@@ -38,17 +55,19 @@ const redisStore = new RedisStore({
   prefix: "sess:",
 });
 
+/* ------------------ SESSION CONFIG ------------------ */
 app.use(
   session({
     store: redisStore,
     name: "ai-resume.sid",
-    secret: process.env.SESSION_SECRET || "dev-fallback-secret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // change to true in production (HTTPS)
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      secure: true,          // must be true for Netlify (HTTPS)
+      sameSite: "none",      // required for cross-domain cookies
+      maxAge: 1000 * 60 * 60 * 24
     },
   })
 );
@@ -62,6 +81,7 @@ app.use(passport.session());
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/interview", interviewRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 /* ------------------ HEALTH CHECK ------------------ */
 app.get("/api/health", (req, res) => {
@@ -70,7 +90,7 @@ app.get("/api/health", (req, res) => {
 
 /* ------------------ GLOBAL ERROR HANDLER ------------------ */
 app.use((err, req, res, next) => {
-  console.error("Unhandled Error:", err);
+  console.error("Unhandled Error:", err.message);
   res.status(500).json({ message: "Internal Server Error" });
 });
 
@@ -87,7 +107,7 @@ const startServer = async () => {
     });
 
   } catch (error) {
-    console.error("❌ Server failed to start:", error);
+    console.error("❌ Server failed to start:", error.message);
     process.exit(1);
   }
 };

@@ -1,24 +1,36 @@
 import { GoogleGenAI } from "@google/genai";
 
-/*
-  The API key is automatically read from:
-  process.env.GEMINI_API_KEY
-
-  Make sure your .env contains:
-  GEMINI_API_KEY=your_key_here
-*/
-
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 /* ======================================================
-   🔹 Utility: Safe JSON Extractor
+   🔹 Safe Text Extraction (Aligned with whisper.service)
+====================================================== */
+const extractText = (response) => {
+  return (
+    response?.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text || "")
+      .join(" ")
+      .trim() || ""
+  );
+};
+
+/* ======================================================
+   🔹 Robust JSON Extractor
 ====================================================== */
 const extractJSON = (text) => {
   try {
+    if (!text) throw new Error("Empty response");
+
     const cleaned = text
-      .replace(/```json/g, "")
+      .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
+
+    try {
+      return JSON.parse(cleaned);
+    } catch (_) {}
 
     const match = cleaned.match(/\{[\s\S]*\}/);
 
@@ -33,29 +45,57 @@ const extractJSON = (text) => {
 };
 
 /* ======================================================
-   1️⃣ Generate Resume-Based Interview Questions
+   🔹 Retry Wrapper (Handles 503)
 ====================================================== */
+const withRetry = async (fn, retries = 2) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (
+      retries > 0 &&
+      (error?.status === 503 ||
+        error?.message?.includes("UNAVAILABLE"))
+    ) {
+      console.log("Gemini overloaded. Retrying...");
+      await new Promise((res) => setTimeout(res, 2000));
+      return withRetry(fn, retries - 1);
+    }
+    throw error;
+  }
+};
+
+/* ======================================================
+   1️⃣ Generate STRICT Resume-Based Interview Questions
+====================================================== */
+
 export const generateQuestions = async (resumeText) => {
   try {
-    if (!resumeText || resumeText.length < 50) {
-      throw new Error("Resume text too short");
+    if (!resumeText || resumeText.trim().length < 100) {
+      throw new Error("Resume text too short or empty");
     }
 
     const prompt = `
-You are a senior technical interviewer.
+You are a STRICT AI technical interviewer.
 
-STRICT RULES:
-- Questions must reference tools, frameworks, or projects mentioned in the resume.
-- Do NOT ask generic questions.
-- Do NOT number the questions.
-- Return ONLY raw JSON.
+CRITICAL RULES:
+- Use ONLY the information inside the resume below.
+- DO NOT assume skills, tools, or experience not explicitly written.
+- DO NOT generate generic interview questions.
+- Every question MUST directly reference:
+  • A mentioned technology
+  • OR a mentioned project
+  • OR a mentioned role
+  • OR a mentioned achievement
+- If a skill is not present, DO NOT ask about it.
+- If resume lacks technical depth, create behavioral questions strictly from described experiences.
+- Before returning output, mentally verify each question is grounded in the resume.
 
-Generate:
-- 5 technical questions
-- 3 project deep dive questions
-- 2 behavioral questions
+RETURN ONLY VALID JSON.
+NO markdown.
+NO explanation.
+NO numbering.
 
-Return EXACT JSON format:
+Exact format:
 
 {
   "technical": ["", "", "", "", ""],
@@ -63,34 +103,44 @@ Return EXACT JSON format:
   "behavioral": ["", ""]
 }
 
-Resume:
+RESUME CONTENT:
+"""
 ${resumeText}
+"""
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      temperature: 0.4,
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        temperature: 0.2, // 🔥 Lower temperature for strict grounding
+      })
+    );
 
-    const text =
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      response?.text;
-
-    if (!text) {
-      throw new Error("Empty Gemini response");
-    }
+    const text = extractText(response);
+    if (!text) throw new Error("Empty Gemini response");
 
     const parsed = extractJSON(text);
 
     return {
-      technical: (parsed.technical || []).slice(0, 5),
-      project: (parsed.project || []).slice(0, 3),
-      behavioral: (parsed.behavioral || []).slice(0, 2),
+      technical: Array.isArray(parsed.technical)
+        ? parsed.technical.slice(0, 5)
+        : [],
+      project: Array.isArray(parsed.project)
+        ? parsed.project.slice(0, 3)
+        : [],
+      behavioral: Array.isArray(parsed.behavioral)
+        ? parsed.behavioral.slice(0, 2)
+        : [],
     };
   } catch (error) {
     console.error("Gemini Question Generation Error:", error.message);
-    throw new Error("Gemini question generation failed");
+
+    return {
+      technical: [],
+      project: [],
+      behavioral: [],
+    };
   }
 };
 
@@ -123,12 +173,6 @@ ${question}
 Candidate Answer:
 ${transcript}
 
-Score from 0-10 on:
-1. Technical accuracy
-2. Communication clarity
-3. Confidence
-4. Relevance
-
 Return ONLY valid JSON:
 
 {
@@ -143,23 +187,20 @@ Return ONLY valid JSON:
 }
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      temperature: 0.3,
-    });
+    const response = await withRetry(() =>
+      ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        temperature: 0.3,
+      })
+    );
 
-    const text =
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      response?.text;
+    const text = extractText(response);
 
-    if (!text) {
-      throw new Error("Empty Gemini response");
-    }
+    if (!text) throw new Error("Empty Gemini response");
 
     const parsed = extractJSON(text);
 
-    // Defensive fallback
     return {
       score:
         typeof parsed.score === "number"
