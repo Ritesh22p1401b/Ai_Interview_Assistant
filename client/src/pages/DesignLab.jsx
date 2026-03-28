@@ -1,5 +1,4 @@
 import { useState } from "react";
-import AICube from "../components/AICube";
 import AISphere from "../components/AISphere";
 
 export default function DesignLab() {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import axios from "../services/axios";
+import API from "../services/axios";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -16,25 +16,59 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  /* ================= HANDLE CHANGE ================= */
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
   };
 
+  /* ================= VALIDATION ================= */
+  const validateForm = () => {
+    if (!form.name.trim()) return "Name is required";
+    if (!form.email.trim()) return "Email is required";
+    if (!/\S+@\S+\.\S+/.test(form.email))
+      return "Enter a valid email address";
+    if (form.password.length < 6)
+      return "Password must be at least 6 characters";
+    return null;
+  };
+
+  /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (loading) return;
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setError("");
     setLoading(true);
 
     try {
-      const response = await axios.post("/auth/signup", form);
+      const response = await API.post(
+        "/auth/signup",
+        {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+        },
+        { withCredentials: true } // important if using sessions
+      );
 
-      // 🔥 Important: expects { token, user } from backend
+      // expects { token, user }
       await signup(response.data);
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError(
-        err.response?.data?.message || "Signup failed. Try again."
+        err.response?.data?.message ||
+          "Signup failed. Please try again."
       );
     } finally {
       setLoading(false);
@@ -64,7 +98,8 @@ export default function Signup() {
             value={form.name}
             onChange={handleChange}
             required
-            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400"
+            disabled={loading}
+            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400 disabled:opacity-60"
           />
 
           <input
@@ -74,7 +109,8 @@ export default function Signup() {
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400"
+            disabled={loading}
+            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400 disabled:opacity-60"
           />
 
           <input
@@ -84,13 +120,14 @@ export default function Signup() {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400"
+            disabled={loading}
+            className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-green-400 disabled:opacity-60"
           />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-60"
+            className="w-full py-3 bg-green-400 text-black font-semibold rounded-lg hover:scale-105 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Creating Account..." : "Sign Up"}
           </button>
